@@ -8,7 +8,7 @@ def start_workers(num_workers, base_port):
         process = subprocess.Popen(
             [
                 "python",
-                "C:\\Users\\PC\\VSCODE\\C#\\Filer-Downloader\\src\\worker_server.py",
+                "./worker_server.py",
                 str(port),
             ]
         )

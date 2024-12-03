@@ -6,4 +6,4 @@ def generate_large_file(file_path, size_in_mb):
     print(f"Generated {file_path} of size {size_in_mb} MB.")
 
 if __name__ == "__main__":
-    generate_large_file("large_file.bin", 25)
+    generate_large_file("large_file.bin", 50)
