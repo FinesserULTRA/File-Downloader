@@ -1,6 +1,0 @@
-This is a sample text file.
-It contains multiple lines of text.
-You can use this file to test file splitting functionality.
-Each line represents a piece of data.
-Feel free to modify the content as needed.
-This is the last line of the sample file.
