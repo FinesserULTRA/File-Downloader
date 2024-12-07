@@ -10,7 +10,7 @@ logging.basicConfig(
 )
 
 # Configuration
-SEGMENT_SIZE = 1024 * 1024  # 1MB
+SEGMENT_SIZE = (1024 * 1024 * 250) / 9  # 1MB # 1MB
 
 
 def handle_client(client_socket, base_path):

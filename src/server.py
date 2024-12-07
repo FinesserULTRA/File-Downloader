@@ -10,7 +10,7 @@ logging.basicConfig(
 
 # Configuration
 MAIN_SERVER_PORT = 8000
-SEGMENT_SIZE = 1024 * 1024  # 1MB
+SEGMENT_SIZE = (1024 * 1024 * 250) / 9  # 1MB  # 1MB
 MINOR_SERVERS = [
     {"port": 8001, "segments": [1, 2, 3]},
     {"port": 8002, "segments": [4, 5, 6]},

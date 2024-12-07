@@ -13,7 +13,7 @@ logging.basicConfig(
 # Configuration
 MAIN_SERVER_HOST = "localhost"
 MAIN_SERVER_PORT = 8000
-SEGMENT_SIZE = 1024 * 1024  # 1MB
+SEGMENT_SIZE = int((1024 * 1024 * 250) / 9)  # 1MB # 1MB
 MAX_RETRIES = 3
 
 
