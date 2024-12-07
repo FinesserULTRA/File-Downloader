@@ -1,3 +1,7 @@
+server1_segments/*
+server2_segments/*
+server3_segments/*
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

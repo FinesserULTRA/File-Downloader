@@ -1,121 +1,114 @@
 import socket
-import sys
-import os
 import json
-import threading
+import os
+import struct
+from threading import Thread, Lock
+import logging
 
-DELIMITER = "||"
-RECOMBINED_DIR = "recombined"
-os.makedirs(RECOMBINED_DIR, exist_ok=True)
+# Set up logging
+logging.basicConfig(
+    level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s"
+)
 
-
-def request_file(server_host, server_port, file_name):
-    try:
-        # Connect to the main server
-        client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        client_socket.connect((server_host, server_port))
-        request = f"GET {file_name}"
-        client_socket.send(request.encode())
-        response = client_socket.recv(4096).decode()
-        client_socket.close()
-
-        return json.loads(response)
-    except Exception as e:
-        print(f"Error: {e}")
-        return None
+# Configuration
+MAIN_SERVER_HOST = "localhost"
+MAIN_SERVER_PORT = 8000
+SEGMENT_SIZE = 1024 * 1024  # 1MB
+MAX_RETRIES = 3
 
 
-def request_fragment(server_info, fragment_name):
-    try:
-        worker_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        worker_socket.connect((server_info["host"], server_info["port"]))
+class FileDownloader:
+    def __init__(self, output_file, total_segments):
+        self.output_file = output_file
+        self.total_segments = total_segments
+        self.downloaded_segments = set()
+        self.lock = Lock()
 
-        # Send the "DOWNLOAD" request
-        request = f"DOWNLOAD{DELIMITER}{fragment_name}"
-        worker_socket.sendall(request.encode())
+    def download_segment(self, segment_id):
+        for attempt in range(MAX_RETRIES):
+            try:
+                # Get segment info from main server
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                    s.connect((MAIN_SERVER_HOST, MAIN_SERVER_PORT))
+                    request = {"type": "get_segment_info", "segment_id": segment_id}
+                    s.send(json.dumps(request).encode())
+                    response = json.loads(s.recv(1024).decode())
 
-        # Receive fragment data
-        fragment_data = b""
-        while True:
-            data = worker_socket.recv(4096)
-            if not data:
-                break
-            fragment_data += data
+                if "error" in response:
+                    logging.warning(f"Error getting segment info: {response['error']}")
+                    continue
 
-        worker_socket.close()
-        if fragment_data.startswith(b"ERROR"):
-            print(
-                f"Error retrieving fragment '{fragment_name}' from {server_info['host']}:{server_info['port']}"
-            )
-            return None
-        return fragment_data
-    except Exception as e:
-        print(
-            f"Error retrieving fragment '{fragment_name}' from {server_info['host']}:{server_info['port']} - {e}"
+                # Download segment from minor server
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                    s.connect((MAIN_SERVER_HOST, response["port"]))
+                    s.send(f"GET_SEGMENT {segment_id}".encode())
+
+                    # Receive segment size
+                    size_data = s.recv(4)
+                    size = struct.unpack("!I", size_data)[0]
+
+                    if size == 0:
+                        logging.warning(
+                            f"Error downloading segment {segment_id}: Segment not found"
+                        )
+                        continue
+
+                    # Receive segment data
+                    segment_data = b""
+                    while len(segment_data) < size:
+                        chunk = s.recv(min(4096, size - len(segment_data)))
+                        if not chunk:
+                            break
+                        segment_data += chunk
+
+                # Write segment to file
+                with self.lock:
+                    with open(self.output_file, "r+b") as f:
+                        f.seek((segment_id - 1) * SEGMENT_SIZE)
+                        f.write(segment_data)
+                    self.downloaded_segments.add(segment_id)
+
+                logging.info(f"Downloaded segment {segment_id}")
+                return True
+
+            except Exception as e:
+                logging.error(
+                    f"Error downloading segment {segment_id} (attempt {attempt + 1}): {e}"
+                )
+
+        logging.error(
+            f"Failed to download segment {segment_id} after {MAX_RETRIES} retries"
         )
-        return None
+        return False
 
+    def download(self):
+        threads = []
+        for segment_id in range(1, self.total_segments + 1):
+            if segment_id not in self.downloaded_segments:
+                thread = Thread(target=self.download_segment, args=(segment_id,))
+                thread.start()
+                threads.append(thread)
 
-def recombine_fragments(assignments, output_file):
-    with open(output_file, "wb") as outfile:
-        for assignment in assignments:
-            server_info = assignment["server"]
-            fragment_name = assignment["fragment"]
-            fragment_data = request_fragment(server_info, fragment_name)
-            if fragment_data is not None:
-                outfile.write(fragment_data)
-            else:
-                print(f"Failed to retrieve fragment: {fragment_name}")
-                return False
-    print(f"Recombined file saved as {output_file}")
-    return True
+        for thread in threads:
+            thread.join()
 
-
-def threaded_request_fragment(server_info, fragment_name, results, index):
-    fragment_data = request_fragment(server_info, fragment_name)
-    results[index] = fragment_data
+        if len(self.downloaded_segments) == self.total_segments:
+            logging.info("Download completed successfully")
+        else:
+            missing_segments = (
+                set(range(1, self.total_segments + 1)) - self.downloaded_segments
+            )
+            logging.warning(
+                f"Download incomplete. Missing segments: {missing_segments}"
+            )
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 4:
-        print("Usage: python client.py <server_host> <server_port> <file_name>")
-        sys.exit(1)
+    output_file = "downloaded_file.bin"
+    total_segments = 9  # Number of segments we define in server.py
 
-    server_host = sys.argv[1]
-    server_port = int(sys.argv[2])
-    file_name = sys.argv[3]
+    with open(output_file, "wb") as f:
+        f.write(b"\0" * SEGMENT_SIZE * total_segments)
 
-    # Step 1: Request file fragments from the main server
-    assignments = request_file(server_host, server_port, file_name)
-    if not assignments:
-        print("Failed to retrieve fragment information from the main server.")
-        sys.exit(1)
-
-    # Step 2: Recombine fragments into the original file using multiple threads
-    output_file = os.path.join(RECOMBINED_DIR, os.path.basename(file_name))
-    results = [None] * len(assignments)
-    threads = []
-
-    for i, assignment in enumerate(assignments):
-        server_info = assignment["server"]
-        fragment_name = assignment["fragment"]
-        thread = threading.Thread(
-            target=threaded_request_fragment,
-            args=(server_info, fragment_name, results, i),
-        )
-        threads.append(thread)
-        thread.start()
-
-    for thread in threads:
-        thread.join()
-
-    with open(output_file, "wb") as outfile:
-        for fragment_data in results:
-            if fragment_data is not None:
-                outfile.write(fragment_data)
-            else:
-                print("File recombination failed.")
-                sys.exit(1)
-
-    print(f"Recombined file saved as {output_file}")
-    print("File recombination successful!")
+    downloader = FileDownloader(output_file, total_segments)
+    downloader.download()
