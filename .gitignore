@@ -2,6 +2,8 @@ server1_segments/*
 server2_segments/*
 server3_segments/*
 
+node_modules/*
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
