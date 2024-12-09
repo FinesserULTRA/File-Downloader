@@ -110,7 +110,7 @@ List all available files for download from the main server.
 
 ### 5. Resume Downloads
 If a download is interrupted, rerun the same command to resume downloading from the last checkpoint.
-This is done via storing the segments, ids and stuff on the client side, so that it can be paused and resumed at will
+This is done via storing the segments, ids and stuff on the client side, so that it can be paused and resumed at will.
 
 ## File Compression
 Text files are compressed automatically during segmentation to save bandwidth. The client decompresses the segments after downloading.
