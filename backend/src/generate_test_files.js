@@ -40,7 +40,7 @@ function generateFile(filename, size, type) {
 const testFiles = [
     // { name: 'small_file.bin', size: 1024 * 1024, type: 'bin' },
     // { name: 'medium_file.txt', size: 10 * 1024 * 1024, type: 'txt' },
-    { name: 'xml_large.xml', size: 259 * 1024 * 1024, type: 'xml' }
+    { name: 'xml_large.xml', size: 100 * 1024 * 1024, type: 'xml' }
 ];
 
 const testDir = 'test_files';

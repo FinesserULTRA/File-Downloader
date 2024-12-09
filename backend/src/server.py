@@ -6,6 +6,7 @@ import os
 import math
 import zlib
 import time
+import hashlib
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
@@ -18,7 +19,7 @@ MINOR_SERVERS = [
     {"host": "localhost", "port": 8002, "dir": "server2_segments"},
     {"host": "localhost", "port": 8003, "dir": "server3_segments"},
 ]
-FILE_DIR = "test_files"
+FILE_DIR = "data"
 CACHE_FILE = "segment_cache.json"
 CACHE_EXPIRY = 3600  # 1 hour
 
@@ -47,6 +48,10 @@ def compress_data(data):
     return zlib.compress(data)
 
 
+def calculate_checksum(data):
+    return hashlib.md5(data).hexdigest()
+
+
 def create_segments(filename):
     file_path = os.path.join(FILE_DIR, filename)
     file_size = os.path.getsize(file_path)
@@ -70,6 +75,10 @@ def create_segments(filename):
                 data = compress_data(data)
             dst.write(data)
 
+        segment["checksum"] = calculate_checksum(data)
+
+    file_checksum = calculate_checksum(open(file_path, "rb").read())
+
     cache[filename] = {
         "segments": segments,
         "total_segments": num_segments,
@@ -77,6 +86,7 @@ def create_segments(filename):
         "file_size": file_size,
         "is_compressed": is_text_file(filename),
         "last_accessed": time.time(),
+        "checksum": file_checksum,
     }
     save_cache(cache)
     return cache[filename]
@@ -98,13 +108,14 @@ def cleanup_unused_segments():
 
 def list_available_files():
     return [
-        f for f in os.listdir(FILE_DIR) if os.path.isfile(os.path.join(FILE_DIR, f))
+        {"name": f, "size": os.path.getsize(os.path.join(FILE_DIR, f))}
+        for f in os.listdir(FILE_DIR)
+        if os.path.isfile(os.path.join(FILE_DIR, f))
     ]
 
 
 def handle_client(client_socket):
     try:
-        response = {}
         data = client_socket.recv(1024).decode()
         request = json.loads(data)
         logging.info(f"Received request: {request}")
@@ -112,7 +123,7 @@ def handle_client(client_socket):
         if request["type"] == "get_file_info":
             filename = request["filename"]
             if filename not in cache:
-                if filename not in list_available_files():
+                if filename not in [f["name"] for f in list_available_files()]:
                     response = {"error": "File not found"}
                 else:
                     file_info = create_segments(filename)
@@ -121,7 +132,7 @@ def handle_client(client_socket):
                 file_info["last_accessed"] = time.time()
                 save_cache(cache)
 
-            if "error" not in response:
+            if "error" not in locals():
                 response = {
                     "filename": filename,
                     "total_segments": file_info["total_segments"],
@@ -129,14 +140,16 @@ def handle_client(client_socket):
                     "file_size": file_info["file_size"],
                     "segments": file_info["segments"],
                     "is_compressed": file_info["is_compressed"],
+                    "checksum": file_info["checksum"],
                 }
-            client_socket.send(json.dumps(response).encode())
-            logging.info(f"Sent file info for {filename}")
         elif request["type"] == "list_files":
             files = list_available_files()
             response = {"files": files}
-            client_socket.send(json.dumps(response).encode())
-            logging.info("Sent list of available files")
+        else:
+            response = {"error": "Invalid request type"}
+
+        client_socket.sendall(json.dumps(response).encode())
+        logging.info(f"Sent response: {response}")
     except Exception as e:
         logging.error(f"Error handling client: {e}")
     finally:
@@ -165,3 +178,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# Example usage:
+# python server.py

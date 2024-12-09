@@ -78,3 +78,8 @@ if __name__ == "__main__":
     port = int(sys.argv[1])
     base_path = sys.argv[2]
     run_server(port, base_path)
+
+# Example usage:
+# python minor_server.py 8001 server1_segments
+# python minor_server.py 8002 server2_segments
+# python minor_server.py 8003 server3_segments

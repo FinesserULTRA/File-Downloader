@@ -45,11 +45,11 @@ def generate_file(filename, size, file_type):
 
 test_files = [
     {"name": "small_file.bin", "size": 1024 * 1024, "type": "bin"},  # 1 MB
-    {"name": "medium_file.txt", "size": 25 * 1024 * 1024, "type": "txt"},  # 10 MB
-    {"name": "large_file.xml", "size": 200 * 1024 * 1024, "type": "xml"},  # 200 MB
+    {"name": "medium_file.txt", "size": 25 * 1024 * 1024, "type": "txt"},  # 25 MB
+    {"name": "large_file.xml", "size": 500 * 1024 * 1024, "type": "xml"},  # 500 MB
 ]
 
-test_dir = "test_files"
+test_dir = "data"
 if not os.path.exists(test_dir):
     os.makedirs(test_dir)
 
