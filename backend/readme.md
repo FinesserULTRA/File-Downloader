@@ -1,4 +1,4 @@
-*# Distributed File Downloader
+# Distributed File Downloader
 
 This project implements a distributed file downloading system that splits large files into segments, distributes them across multiple minor servers, and allows clients to download and reassemble the file. The system ensures data integrity, supports resuming downloads, and compresses text files for efficient transfers.
 
@@ -118,4 +118,3 @@ We are also doing hashing and verify checks. There is checksum, segment checks e
 
 ## Cache and Cleanup
 The system maintains a cache (`segment_cache.json`) to store metadata about segmented files. Unused segments are automatically deleted after an hour (`CACHE_EXPIRY`).
-*
